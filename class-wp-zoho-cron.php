@@ -426,12 +426,7 @@ class WP_Zoho_Cron {
 						else {
 							$bp_data = xprofile_get_field_data($field, $user_id);
 							if ($bp_field->type == 'datebox' && !empty($bp_data)) {
-								if (preg_match("/^[0-9\-]+$/i", $bp_data)) {
-									$bp_data = date("m/d/Y", $bp_data);
-								}
-								else {
-									$bp_data = date("m/d/Y", strtotime($bp_data));
-								}
+								$bp_data = date("m/d/Y", strtotime($bp_data));
 							}
 							elseif ($bp_field->type == 'url' && !empty($bp_data)) {
 								$bp_data = preg_replace("/^.+? href=\"([^\"]+)\".*$/i", "$1", $bp_data);
