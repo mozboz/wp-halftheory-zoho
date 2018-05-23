@@ -195,27 +195,33 @@ class WP_Zoho {
  		}
 
  		if ($_POST['bulk_update_all_users']) {
- 			$users = array();
- 			$users_args = array(
- 				'exclude' => $plugin->exclude_users,
- 				'fields' => 'ID',
- 				'orderby' => 'ID',
- 			);
- 			if (is_multisite()) {
- 				$sites = get_sites();
-				foreach ($sites as $key => $value) {
-					$blog_users = get_users( array_merge($users_args, array('blog_id' => $value->blog_id)) );
-					if (!empty($blog_users)) {
-						$users = array_merge($users, $blog_users);
+			$cron = $plugin->get_option('cron', false);
+			if (empty($cron)) {
+        		echo '<div class="error"><p><strong>Error: The Cronjob is not active.</strong></p></div>';
+			}
+			else {
+	 			$users = array();
+	 			$users_args = array(
+	 				'exclude' => $plugin->exclude_users,
+	 				'fields' => 'ID',
+	 				'orderby' => 'ID',
+	 			);
+	 			if (is_multisite()) {
+	 				$sites = get_sites();
+					foreach ($sites as $key => $value) {
+						$blog_users = get_users( array_merge($users_args, array('blog_id' => $value->blog_id)) );
+						if (!empty($blog_users)) {
+							$users = array_merge($users, $blog_users);
+						}
 					}
-				}
-				sort($users);
- 			}
-	 		else {
-	 			$users = get_users($users_args);
-	 		} 			
- 			$plugin->cron_contacts_update($users);
-    		echo '<div class="updated"><p><strong>Added all users ('.count($users).') to the next update.</strong></p></div>';
+					sort($users);
+	 			}
+		 		else {
+		 			$users = get_users($users_args);
+		 		} 			
+	 			$plugin->cron_contacts_update($users);
+	    		echo '<div class="updated"><p><strong>Added all users ('.count($users).') to the next update.</strong></p></div>';
+    		}
  		}
 
         if ($_POST['save']) {
@@ -582,6 +588,10 @@ endforeach;
 		}
 
 		// fire updates
+		$cron = $this->get_option('cron', false);
+		if (empty($cron)) {
+			return;
+		}
 		$actions = $this->get_option('actions', array());
 		if (!in_array(__FUNCTION__, $actions)) {
 			return;
@@ -591,6 +601,10 @@ endforeach;
 
 	public function profile_update($user_id = 0, $old_user_data = null) {
 		if (empty($user_id)) {
+			return;
+		}
+		$cron = $this->get_option('cron', false);
+		if (empty($cron)) {
 			return;
 		}
 		$actions = $this->get_option('actions', array());
@@ -605,6 +619,10 @@ endforeach;
 		if (empty($user_id)) {
 			return;
 		}
+		$cron = $this->get_option('cron', false);
+		if (empty($cron)) {
+			return;
+		}
 		$actions = $this->get_option('actions', array());
 		if (!in_array(__FUNCTION__, $actions)) {
 			return;
@@ -614,6 +632,10 @@ endforeach;
 
 	public function xprofile_updated_profile($user_id = 0, $posted_field_ids = array(), $errors = false, $old_values = array(), $new_values = array()) {
 		if (empty($user_id)) {
+			return;
+		}
+		$cron = $this->get_option('cron', false);
+		if (empty($cron)) {
 			return;
 		}
 		$actions = $this->get_option('actions', array());
