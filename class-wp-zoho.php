@@ -194,6 +194,30 @@ class WP_Zoho {
 			}
  		}
 
+ 		if ($_POST['bulk_update_all_users']) {
+ 			$users = array();
+ 			$users_args = array(
+ 				'exclude' => $plugin->exclude_users,
+ 				'fields' => 'ID',
+ 				'orderby' => 'ID',
+ 			);
+ 			if (is_multisite()) {
+ 				$sites = get_sites();
+				foreach ($sites as $key => $value) {
+					$blog_users = get_users( array_merge($users_args, array('blog_id' => $value->blog_id)) );
+					if (!empty($blog_users)) {
+						$users = array_merge($users, $blog_users);
+					}
+				}
+				sort($users);
+ 			}
+	 		else {
+	 			$users = get_users($users_args);
+	 		} 			
+ 			$plugin->cron_contacts_update($users);
+    		echo '<div class="updated"><p><strong>Added all users ('.count($users).') to the next update.</strong></p></div>';
+ 		}
+
         if ($_POST['save']) {
         	$save = function() use ($plugin) {
 				// verify this came from the our screen and with proper authorization
@@ -312,6 +336,11 @@ class WP_Zoho {
 	            <p><label for="<?php echo $plugin->prefix; ?>_cron_direct"><input type="checkbox" id="<?php echo $plugin->prefix; ?>_cron_direct" name="<?php echo $plugin->prefix; ?>_cron_direct" value="1"<?php checked($options['cron_direct'], 1); ?> /> <?php _e('Execute the Cronjob via direct file.'); ?></label><br />
 	            <span class="description"><?php _e('This can be faster, but may have problems with security plugins.'); ?></span></p>
 
+	            <?php if (!empty($options['cron'])) : ?>
+	        	<p><input type="submit" value="<?php _e('Export data for all users'); ?>" id="bulk_update_all_users" class="button button-large" name="bulk_update_all_users"><br />
+	            <span class="description"><?php _e('This will send the data for all users to Zoho on the next update.'); ?></span></p>
+	            <?php endif; ?>
+
 	            <?php $options['actions'] = $plugin->make_array($options['actions']); ?>
 	            <p><?php _e('Enabled Actions'); ?><br />
 	            <label><input type="checkbox" name="<?php echo $plugin->prefix; ?>_actions[]" value="edit_user_profile_update"<?php if (in_array('edit_user_profile_update', $options['actions'])) { checked(true); } ?> /> edit_user_profile_update</label><br />
@@ -363,7 +392,7 @@ class WP_Zoho {
         	<div class="inside">
 	            <h4><?php _e('User Field Mapping'); ?></h4>
 
-	        	<p><input type="submit" value="<?php _e('Refresh fields from Zoho'); ?>" id="publish" class="button button-large" name="refresh_contacts_zoho_fields"></p>
+	        	<p><input type="submit" value="<?php _e('Refresh fields from Zoho'); ?>" id="refresh_contacts_zoho_fields" class="button button-large" name="refresh_contacts_zoho_fields"></p>
 
 	            <?php
 				$zoho_fields = $plugin->get_contacts_zoho_fields(true);
@@ -931,27 +960,57 @@ endforeach;
 	}
 
 	private function cron_contacts_update($user_id = 0) {
-		if (in_array($user_id, $this->exclude_users)) {
+		if (empty($user_id)) {
 			return;
 		}
-		$arr = $this->get_transient($this->prefix.'_cron_contacts_update');
-		$arr = $this->make_array($arr);
-		if (in_array($user_id, $arr)) {
-			return;
+		if (!is_array($user_id)) {
+			if (in_array($user_id, $this->exclude_users)) {
+				return;
+			}
+			$arr = $this->get_transient($this->prefix.'_cron_contacts_update');
+			$arr = $this->make_array($arr);
+			if (in_array($user_id, $arr)) {
+				return;
+			}
+			$arr[] = $user_id;
 		}
-		$arr[] = $user_id;
+		else {
+			$arr = $this->get_transient($this->prefix.'_cron_contacts_update');
+			$arr = $this->make_array($arr);
+			$arr = array_merge($arr, $user_id);
+			$arr = array_unique($arr);
+			$arr = array_diff($arr, $this->exclude_users);
+			if (empty($arr)) {
+				return;
+			}
+		}
 		$this->set_transient($this->prefix.'_cron_contacts_update', $arr, '2 hours');
 	}
 	private function cron_contacts_delete($user_id = 0) {
-		if (in_array($user_id, $this->exclude_users)) {
+		if (empty($user_id)) {
 			return;
 		}
-		$arr = $this->get_transient($this->prefix.'_cron_contacts_delete');
-		$arr = $this->make_array($arr);
-		if (in_array($user_id, $arr)) {
-			return;
+		if (!is_array($user_id)) {
+			if (in_array($user_id, $this->exclude_users)) {
+				return;
+			}
+			$arr = $this->get_transient($this->prefix.'_cron_contacts_delete');
+			$arr = $this->make_array($arr);
+			if (in_array($user_id, $arr)) {
+				return;
+			}
+			$arr[] = $user_id;
 		}
-		$arr[] = $user_id;
+		else {
+			$arr = $this->get_transient($this->prefix.'_cron_contacts_update');
+			$arr = $this->make_array($arr);
+			$arr = array_merge($arr, $user_id);
+			$arr = array_unique($arr);
+			$arr = array_diff($arr, $this->exclude_users);
+			if (empty($arr)) {
+				return;
+			}
+		}
 		$this->set_transient($this->prefix.'_cron_contacts_delete', $arr, '2 hours');
 	}
 
