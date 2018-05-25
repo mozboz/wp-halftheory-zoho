@@ -40,9 +40,14 @@ class WP_Zoho {
 
 		// admin options
 		if (!$this->is_front_end()) {
-			add_action('admin_menu', array($this,'admin_menu'));
 			if (is_multisite()) {
 				add_action('network_admin_menu', array($this,'admin_menu'));
+				if (is_main_site()) {
+					add_action('admin_menu', array($this,'admin_menu'));
+				}
+			}
+			else {
+				add_action('admin_menu', array($this,'admin_menu'));
 			}
 		}
 
@@ -369,6 +374,9 @@ class WP_Zoho {
 	            <h4><?php _e('Zoho Options'); ?></h4>
 	            <p><span class="description"><?php _e('These details are available from Zoho.'); ?><br />
 	            	<?php _e('Legend: Authtoken = ###AUTHTOKEN###, User ID = ###ID###, User Data = ###XMLDATA###, Search Value = ###SEARCHVALUE###.'); ?></span></p>
+
+	            <p><label for="<?php echo $plugin->prefix; ?>_zoho_api_limit" style="display: inline-block; width: 16em;"><?php _e('Zoho API Request Limit'); ?></label>
+	            <input type="text" id="<?php echo $plugin->prefix; ?>_zoho_api_limit" name="<?php echo $plugin->prefix; ?>_zoho_api_limit" value="<?php echo esc_attr($options['zoho_api_limit']); ?>" style="width: 50%;" /></p>
 
 	            <p><label for="<?php echo $plugin->prefix; ?>_zoho_authtoken" style="display: inline-block; width: 16em;"><?php _e('Zoho Authtoken'); ?></label>
 	            <input type="text" id="<?php echo $plugin->prefix; ?>_zoho_authtoken" name="<?php echo $plugin->prefix; ?>_zoho_authtoken" value="<?php echo esc_attr($options['zoho_authtoken']); ?>" style="width: 50%;" /></p>
@@ -700,7 +708,7 @@ endforeach;
 		}
 		return $value;
 	}
-	private function set_transient($transient, $value, $expiration = 0) {
+	public function set_transient($transient, $value, $expiration = 0) {
 		if (is_string($expiration)) {
 			$expiration = strtotime('+'.$expiration) - time();
 			if (!$expiration || $expiration < 0) {
@@ -736,6 +744,7 @@ endforeach;
 			'cron_direct',
 			'actions',
 			'admin_email',
+			'zoho_api_limit',
 			'zoho_authtoken',
 			'zoho_xml_Contacts_getFields',
 			'zoho_xml_Contacts_insertRecords',
@@ -1047,6 +1056,11 @@ endforeach;
 		}
 		elseif ($force) {
 			$cron = true;
+		}
+
+		if (!$cron) {
+			$this->delete_transient($this->prefix.'_cron_contacts_delete');
+			$this->delete_transient($this->prefix.'_cron_contacts_update');
 		}
 
 		$timestamp = wp_next_scheduled($this->prefix.'_cron');

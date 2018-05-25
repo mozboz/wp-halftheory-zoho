@@ -48,6 +48,7 @@ class WP_Zoho_Plugin {
 					'xprofile_updated_profile',
 				),
 				'admin_email' => get_option('admin_email', ''),
+				'zoho_api_limit' => 1000,
 				'zoho_xml_Contacts_getFields' => 'https://crm.zoho.com/crm/private/xml/Contacts/getFields?authtoken=###AUTHTOKEN###&scope=crmapi',
 				'zoho_xml_Contacts_insertRecords' => 'https://crm.zoho.com/crm/private/xml/Contacts/insertRecords?authtoken=###AUTHTOKEN###&scope=crmapi&newFormat=1&xmlData=###XMLDATA###',
 				'zoho_xml_Contacts_updateRecords' => 'https://crm.zoho.com/crm/private/xml/Contacts/updateRecords?authtoken=###AUTHTOKEN###&scope=crmapi&newFormat=1&id=###ID###&xmlData=###XMLDATA###',
