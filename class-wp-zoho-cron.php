@@ -171,6 +171,10 @@ class WP_Zoho_Cron {
 				$this->messages[] = __FUNCTION__.' - zoho_fields not defined.';
 				break;
 			}
+			$userdata = get_userdata($user_id);
+			if ($this->subclass->user_has_hidden_role($userdata->roles)) {
+				continue;
+			}
 
 			$usermeta = get_user_meta($user_id, $this->prefix, true);
 			$usermeta = $this->subclass->make_array($usermeta);
@@ -180,7 +184,6 @@ class WP_Zoho_Cron {
 			if (!isset($usermeta['zoho_id']) || empty($usermeta['zoho_id'])) {
 				// search by email
 				if (!empty($zoho_xml_Contacts_getSearchRecordsByPDC)) {
-					$userdata = get_userdata($user_id);
 		        	$replace = array(
 		        		'###AUTHTOKEN###' => $zoho_authtoken,
 		        		'###SEARCHVALUE###' => $userdata->user_email,

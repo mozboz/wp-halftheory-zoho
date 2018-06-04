@@ -208,6 +208,7 @@ class WP_Zoho {
 	 			$users = array();
 	 			$users_args = array(
 	 				'exclude' => $plugin->exclude_users,
+	 				'role__not_in' => $plugin->get_option('hidden_roles', array()),
 	 				'fields' => 'ID',
 	 				'orderby' => 'ID',
 	 			);
@@ -404,7 +405,29 @@ class WP_Zoho {
 
         <div class="postbox">
         	<div class="inside">
-	            <h4><?php _e('User Field Mapping'); ?></h4>
+				<h4><?php _e('User Options'); ?></h4>
+	            <p><?php _e('Hidden Roles'); ?><br />
+	            <span class="description"><?php _e('Users with the following roles will be excluded from data transfers.'); ?></span></p>
+	            <?php
+				global $wp_roles;
+				if (!isset($wp_roles)) {
+					$wp_roles = new WP_Roles();
+				}
+				$options['hidden_roles'] = $plugin->make_array($options['hidden_roles']);
+				foreach ($wp_roles->role_names as $key => $value) {
+					echo '<label style="display: inline-block; width: 50%;"><input type="checkbox" name="'.$plugin->prefix.'_hidden_roles[]" value="'.$key.'"';
+					if (in_array($key, $options['hidden_roles'])) {
+						checked($key, $key);
+					}
+					echo '> '.$value.'</label>';
+	            }
+	            ?>
+        	</div>
+        </div>
+
+        <div class="postbox">
+        	<div class="inside">
+				<h4><?php _e('User Field Mapping'); ?></h4>
 
 	        	<p><input type="submit" value="<?php _e('Refresh fields from Zoho'); ?>" id="refresh_contacts_zoho_fields" class="button button-large" name="refresh_contacts_zoho_fields"></p>
 
@@ -493,8 +516,8 @@ class WP_Zoho {
 		if (empty($active)) {
 			return;
 		}
-		$active = $this->get_option('cron', false);
-		if (empty($active)) {
+		$cron = $this->get_option('cron', false);
+		if (empty($cron)) {
 			$this->cron_toggle(false);
 			return;
 		}
@@ -504,19 +527,21 @@ class WP_Zoho {
 			if (!class_exists('WP_Zoho_Cron')) {
 				@include_once(dirname(__FILE__).'/class-wp-zoho-cron.php');
 			}
-			$cron = new WP_Zoho_Cron();
+			$res = new WP_Zoho_Cron();
 		}
 		// execute by calling the file
 		else {
-			$file = plugin_dir_url(__FILE__).'class-wp-zoho-cron.php';
+			$url = plugin_dir_url(__FILE__).'class-wp-zoho-cron.php';
 			if (function_exists('curl_init')) {
-				$c = @curl_init($file);
-				curl_exec($c);
+				$c = @curl_init();
+				curl_setopt($c, CURLOPT_RETURNTRANSFER, 1);
+				curl_setopt($c, CURLOPT_URL, $url);
+				$res = curl_exec($c);
 				curl_close($c);
 			}
 			else {
-				$cmd = 'wget -v '.$file.' >/dev/null 2>&1';
-				@exec($cmd, $output);
+				$cmd = 'wget -v '.$url.' >/dev/null 2>&1';
+				@exec($cmd, $res);
 			}
 		}
 	}
@@ -526,6 +551,9 @@ class WP_Zoho {
 			return;
 		}
 		if (in_array($profileuser->ID, $this->exclude_users)) {
+			return;
+		}
+		if ($this->user_has_hidden_role($profileuser->roles)) {
 			return;
 		}
 		$has_cap = false;
@@ -566,6 +594,10 @@ endforeach;
 		if (in_array($user_id, $this->exclude_users)) {
 			return;
 		}
+		$userdata = get_userdata($user_id);
+		if ($this->user_has_hidden_role($userdata->roles)) {
+			return;
+		}
 		// usermeta
 		$has_cap = false;
 		if (current_user_can('edit_users')) {
@@ -596,10 +628,6 @@ endforeach;
 		}
 
 		// fire updates
-		$cron = $this->get_option('cron', false);
-		if (empty($cron)) {
-			return;
-		}
 		$actions = $this->get_option('actions', array());
 		if (!in_array(__FUNCTION__, $actions)) {
 			return;
@@ -609,10 +637,6 @@ endforeach;
 
 	public function profile_update($user_id = 0, $old_user_data = null) {
 		if (empty($user_id)) {
-			return;
-		}
-		$cron = $this->get_option('cron', false);
-		if (empty($cron)) {
 			return;
 		}
 		$actions = $this->get_option('actions', array());
@@ -627,10 +651,6 @@ endforeach;
 		if (empty($user_id)) {
 			return;
 		}
-		$cron = $this->get_option('cron', false);
-		if (empty($cron)) {
-			return;
-		}
 		$actions = $this->get_option('actions', array());
 		if (!in_array(__FUNCTION__, $actions)) {
 			return;
@@ -640,10 +660,6 @@ endforeach;
 
 	public function xprofile_updated_profile($user_id = 0, $posted_field_ids = array(), $errors = false, $old_values = array(), $new_values = array()) {
 		if (empty($user_id)) {
-			return;
-		}
-		$cron = $this->get_option('cron', false);
-		if (empty($cron)) {
 			return;
 		}
 		$actions = $this->get_option('actions', array());
@@ -752,6 +768,7 @@ endforeach;
 			'zoho_xml_Contacts_deleteRecords',
 			'zoho_xml_Contacts_getRecordById',
 			'zoho_xml_Contacts_getSearchRecordsByPDC',
+			'hidden_roles',
 			'user_field_map',
 		);
     }
@@ -760,6 +777,23 @@ endforeach;
 			'zoho_id',
 			'last_updated',
 		);
+    }
+
+    public function user_has_hidden_role($roles = array()) {
+    	$hidden_roles = $this->get_option('hidden_roles', array());
+    	if (empty($hidden_roles)) {
+    		return false;
+    	}
+    	$roles = $this->make_array($roles);
+    	if (empty($roles)) {
+    		return false;
+    	}
+    	foreach ($roles as $role) {
+    		if (in_array($role, $hidden_roles)) {
+    			return true;
+    		}
+    	}
+		return false;
     }
 
 	public function get_file_contents($url = '') {
@@ -994,8 +1028,16 @@ endforeach;
 		if (empty($user_id)) {
 			return;
 		}
+		$cron = $this->get_option('cron', false);
+		if (empty($cron)) {
+			return;
+		}
 		if (!is_array($user_id)) {
 			if (in_array($user_id, $this->exclude_users)) {
+				return;
+			}
+			$userdata = get_userdata($user_id);
+			if ($this->user_has_hidden_role($userdata->roles)) {
 				return;
 			}
 			$arr = $this->get_transient($this->prefix.'_cron_contacts_update');
@@ -1019,6 +1061,10 @@ endforeach;
 	}
 	private function cron_contacts_delete($user_id = 0) {
 		if (empty($user_id)) {
+			return;
+		}
+		$cron = $this->get_option('cron', false);
+		if (empty($cron)) {
 			return;
 		}
 		if (!is_array($user_id)) {
