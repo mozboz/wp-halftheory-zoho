@@ -1032,30 +1032,41 @@ endforeach;
 		if (empty($cron)) {
 			return;
 		}
-		if (!is_array($user_id)) {
-			if (in_array($user_id, $this->exclude_users)) {
-				return;
+		$arr = $this->get_transient($this->prefix.'_cron_contacts_update');
+		$arr = $this->make_array($arr);
+
+		// test function
+		$plugin = new self(false);
+		$func = function($user_id) use ($arr, $plugin) {
+			if (in_array($user_id, $arr)) {
+				return false;
+			}
+			if (in_array($user_id, $plugin->exclude_users)) {
+				$plugin->cron_contacts_delete($user_id);
+				return false;
 			}
 			$userdata = get_userdata($user_id);
-			if ($this->user_has_hidden_role($userdata->roles)) {
-				return;
+			if ($plugin->user_has_hidden_role($userdata->roles)) {
+				$plugin->cron_contacts_delete($user_id);
+				return false;
 			}
-			$arr = $this->get_transient($this->prefix.'_cron_contacts_update');
-			$arr = $this->make_array($arr);
-			if (in_array($user_id, $arr)) {
-				return;
+			return true;
+		};
+
+		if (is_array($user_id)) {
+			foreach ($user_id as $id) {
+				if ($func($id)) {
+					$arr[] = $id;
+				}
 			}
-			$arr[] = $user_id;
 		}
 		else {
-			$arr = $this->get_transient($this->prefix.'_cron_contacts_update');
-			$arr = $this->make_array($arr);
-			$arr = array_merge($arr, $user_id);
-			$arr = array_unique($arr);
-			$arr = array_diff($arr, $this->exclude_users);
-			if (empty($arr)) {
-				return;
+			if ($func($user_id)) {
+				$arr[] = $user_id;
 			}
+		}
+		if (empty($arr)) {
+			return;
 		}
 		$this->set_transient($this->prefix.'_cron_contacts_update', $arr, '2 hours');
 	}
@@ -1067,26 +1078,37 @@ endforeach;
 		if (empty($cron)) {
 			return;
 		}
-		if (!is_array($user_id)) {
-			if (in_array($user_id, $this->exclude_users)) {
-				return;
+		$arr = $this->get_transient($this->prefix.'_cron_contacts_delete');
+		$arr = $this->make_array($arr);
+
+		// test function - use user_id => zoho_id pair, as meta may be deleted before cron can get it
+		$plugin = new self(false);
+		$func = function($user_id) use ($arr, $plugin) {
+			if (array_key_exists($user_id, $arr)) {
+				return false;
 			}
-			$arr = $this->get_transient($this->prefix.'_cron_contacts_delete');
-			$arr = $this->make_array($arr);
-			if (in_array($user_id, $arr)) {
-				return;
+			$usermeta = get_user_meta($user_id, $plugin->prefix, true);
+			$usermeta = $plugin->make_array($usermeta);
+			if (!isset($usermeta['zoho_id']) || empty($usermeta['zoho_id'])) {
+				return false;
 			}
-			$arr[] = $user_id;
+			return $usermeta['zoho_id'];
+		};
+
+		if (is_array($user_id)) {
+			foreach ($user_id as $id) {
+				if ($zoho_id = $func($id)) {
+					$arr[$id] = $zoho_id;
+				}
+			}
 		}
 		else {
-			$arr = $this->get_transient($this->prefix.'_cron_contacts_update');
-			$arr = $this->make_array($arr);
-			$arr = array_merge($arr, $user_id);
-			$arr = array_unique($arr);
-			$arr = array_diff($arr, $this->exclude_users);
-			if (empty($arr)) {
-				return;
+			if ($zoho_id = $func($user_id)) {
+				$arr[$user_id] = $zoho_id;
 			}
+		}
+		if (empty($arr)) {
+			return;
 		}
 		$this->set_transient($this->prefix.'_cron_contacts_delete', $arr, '2 hours');
 	}

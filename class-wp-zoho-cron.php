@@ -87,24 +87,17 @@ class WP_Zoho_Cron {
     	$zoho_xml_Contacts_deleteRecords = $this->subclass->get_option('zoho_xml_Contacts_deleteRecords', '');
     	$nexttime = array();
 
-    	foreach ($this->delete as $user_id) {
+    	foreach ($this->delete as $user_id => $zoho_id) {
     		if ($this->zoho_api_requests >= $this->zoho_api_limit) {
-    			$nexttime[] = $user_id;
+    			$nexttime[$user_id] = $zoho_id;
     			continue;
     		}
-			$usermeta = get_user_meta($user_id, $this->prefix, true);
-			$usermeta = $this->subclass->make_array($usermeta);
 			// delete meta
 			delete_user_meta($user_id, $this->prefix);
 			// remove from update
 			if (in_array($user_id, $this->update)) {
 				$key = array_search($user_id, $this->update);
 				unset($this->update[$key]);
-			}
-			if (!isset($usermeta['zoho_id']) || empty($usermeta['zoho_id'])) {
-				// error
-				$this->messages[] = __FUNCTION__.' - user_id '.$user_id.' - zoho_id not defined.';
-				continue;
 			}
 			if (empty($zoho_authtoken)) {
 				// error
@@ -119,16 +112,16 @@ class WP_Zoho_Cron {
 			// delete zoho 
         	$replace = array(
         		'###AUTHTOKEN###' => $zoho_authtoken,
-        		'###ID###' => $usermeta['zoho_id'],
+        		'###ID###' => $zoho_id,
         	);
         	$url = str_replace(array_keys($replace), $replace, $zoho_xml_Contacts_deleteRecords);
     		if ($xml = $this->subclass->get_file_contents($url)) {
 				// ok
-				//$this->messages[] = __FUNCTION__.' - user_id '.$user_id.' - zoho_id '.$usermeta['zoho_id'].' - ok.';
+				//$this->messages[] = __FUNCTION__.' - user_id '.$user_id.' - zoho_id '.$zoho_id.' - ok.';
     		}
     		else {
     			// error
-				$this->messages[] = __FUNCTION__.' - user_id '.$user_id.' - zoho_id '.$usermeta['zoho_id'].' - zoho_xml_Contacts_deleteRecords XML failed.';
+				$this->messages[] = __FUNCTION__.' - user_id '.$user_id.' - zoho_id '.$zoho_id.' - zoho_xml_Contacts_deleteRecords XML failed.';
     		}
 			++$this->zoho_api_requests;
     	}
@@ -315,7 +308,7 @@ class WP_Zoho_Cron {
 		if (empty($admin_email)) {
 			return;
 		}
-		wp_mail($admin_email, $this->subclass->plugin_title.' - '.get_called_class(), $message);
+		wp_mail($admin_email, $this->subclass->plugin_title.' plugin notice - '.get_called_class(), $message);
 	}
 
 	/* functions */
