@@ -547,7 +547,11 @@ class WP_Zoho {
                     curl_setopt($c, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($c, CURLOPT_SSL_VERIFYPEER, false);
                     curl_setopt($c, CURLOPT_SSL_VERIFYHOST, 0);
-                    curl_setopt($c, CURLOPT_USERAGENT, $this->plugin_title);
+					$user_agent = $this->plugin_title;
+					if (isset($_SERVER["HTTP_USER_AGENT"]) && !empty($_SERVER["HTTP_USER_AGENT"])) {
+						$user_agent = $_SERVER["HTTP_USER_AGENT"];
+					}
+                    curl_setopt($c, CURLOPT_USERAGENT, $user_agent);
                     $res = curl_exec($c);
                 }
                 curl_close($c);
@@ -814,13 +818,34 @@ endforeach;
 			$func = __FUNCTION__;
 			return $func($url);
 		}
-		$str = @file_get_contents($url);
+		// use user_agent when available
+		$user_agent = $this->plugin_title;
+		if (isset($_SERVER["HTTP_USER_AGENT"]) && !empty($_SERVER["HTTP_USER_AGENT"])) {
+			$user_agent = $_SERVER["HTTP_USER_AGENT"];
+		}
+		// try php
+		$options = array('http' => array('user_agent' => $user_agent));
+		$context = stream_context_create($options);
+		$str = @file_get_contents($url, false, $context);
+		// try curl
 		if (strpos($str, '<') === false) {
 			if (function_exists('curl_init')) {
 				$c = @curl_init();
-				curl_setopt($c, CURLOPT_RETURNTRANSFER, 1);
+				// try 'correct' way
 				curl_setopt($c, CURLOPT_URL, $url);
-				$str = curl_exec($c);
+                curl_setopt($c, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($c, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($c, CURLOPT_MAXREDIRS, 10);
+                $str = curl_exec($c);
+                // try 'insecure' way
+                if (empty($str)) {
+                    curl_setopt($c, CURLOPT_URL, $url);
+                    curl_setopt($c, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($c, CURLOPT_SSL_VERIFYPEER, false);
+                    curl_setopt($c, CURLOPT_SSL_VERIFYHOST, 0);
+                    curl_setopt($c, CURLOPT_USERAGENT, $user_agent);
+                    $str = curl_exec($c);
+                }
 				curl_close($c);
 			}
 		}
