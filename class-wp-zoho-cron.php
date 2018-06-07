@@ -297,6 +297,7 @@ class WP_Zoho_Cron {
 
 	private function cron_mail() {
 		if (empty($this->messages)) {
+			echo 'OK!';
 			return;
 		}
 		$this->messages = array_unique($this->messages);

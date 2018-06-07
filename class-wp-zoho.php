@@ -521,6 +521,7 @@ class WP_Zoho {
 			$this->cron_toggle(false);
 			return;
 		}
+		$res = null;
 		$cron_direct = $this->get_option('cron_direct', false);
 		// execute in the action
 		if (empty($cron_direct)) {
@@ -533,13 +534,25 @@ class WP_Zoho {
 		else {
 			$url = plugin_dir_url(__FILE__).'class-wp-zoho-cron.php';
 			if (function_exists('curl_init')) {
-				$c = @curl_init();
-				curl_setopt($c, CURLOPT_RETURNTRANSFER, 1);
-				curl_setopt($c, CURLOPT_URL, $url);
-				$res = curl_exec($c);
-				curl_close($c);
+                $c = @curl_init();
+                // try 'correct' way
+                curl_setopt($c, CURLOPT_URL, $url);
+                curl_setopt($c, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($c, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($c, CURLOPT_MAXREDIRS, 10);
+                $res = curl_exec($c);
+                // try 'insecure' way
+                if (empty($res)) {
+                    curl_setopt($c, CURLOPT_URL, $url);
+                    curl_setopt($c, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($c, CURLOPT_SSL_VERIFYPEER, false);
+                    curl_setopt($c, CURLOPT_SSL_VERIFYHOST, 0);
+                    curl_setopt($c, CURLOPT_USERAGENT, $this->plugin_title);
+                    $res = curl_exec($c);
+                }
+                curl_close($c);
 			}
-			else {
+			if (empty($res)) {
 				$cmd = 'wget -v '.$url.' >/dev/null 2>&1';
 				@exec($cmd, $res);
 			}
