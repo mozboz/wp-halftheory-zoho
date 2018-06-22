@@ -668,6 +668,7 @@ endforeach;
 		if (empty($user_id)) {
 			return;
 		}
+		delete_user_meta($user_id, $this->prefix);
 		$actions = $this->get_option('actions', array());
 		if (!in_array(__FUNCTION__, $actions)) {
 			return;
