@@ -815,10 +815,10 @@ endforeach;
     }
 
 	public function get_file_contents($url = '') {
-		if (function_exists(__FUNCTION__)) {
-			$func = __FUNCTION__;
-			return $func($url);
+		if (empty($url)) {
+			return false;
 		}
+		$str = '';
 		// use user_agent when available
 		$user_agent = $this->plugin_title;
 		if (isset($_SERVER["HTTP_USER_AGENT"]) && !empty($_SERVER["HTTP_USER_AGENT"])) {
@@ -826,8 +826,20 @@ endforeach;
 		}
 		// try php
 		$options = array('http' => array('user_agent' => $user_agent));
-		$context = stream_context_create($options);
-		$str = @file_get_contents($url, false, $context);
+		// try 'correct' way
+		if ($str_php = @file_get_contents($url, false, stream_context_create($options))) {
+			$str = $str_php;
+		}
+		// try 'insecure' way
+		if (empty($str)) {
+			$options['ssl'] = array(
+				'verify_peer' => false,
+				'verify_peer_name' => false,
+			);
+			if ($str_php = @file_get_contents($url, false, stream_context_create($options))) {
+				$str = $str_php;
+			}
+		}
 		// try curl
 		if (strpos($str, '<') === false) {
 			if (function_exists('curl_init')) {
