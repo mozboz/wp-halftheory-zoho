@@ -104,7 +104,7 @@ class WP_Zoho {
 			return false;
 		}
 		if (wp_doing_ajax()) {
-			if (strpos(get_current_uri(), admin_url()) !== false) {
+			if (strpos($this->get_current_uri(), admin_url()) !== false) {
 				return false;
 			}
 		}
